@@ -28,3 +28,5 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+reference/**/wmstransfer_export.txt
