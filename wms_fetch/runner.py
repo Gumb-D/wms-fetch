@@ -16,13 +16,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import exports
+from .exports._base import SessionExpired
 
 
 @dataclass
 class Result:
     project: str
     export: str
-    status: str           # "ok" | "failed"
+    status: str           # "ok" | "failed" | "skipped"
     file: str | None = None
     bytes: int | None = None
     duration_s: float | None = None
@@ -59,6 +60,24 @@ def run_batch(
                     bytes=path.stat().st_size,
                     duration_s=round(time.monotonic() - t0, 1),
                 ))
+            except SessionExpired:
+                # Fatal: every remaining export would fail the same way, each
+                # after a 240s poll. Abort now and report what is left undone.
+                log(f"  [ABORT] {project}/{name}: session expired")
+                results.append(Result(
+                    project=project, export=name, status="failed",
+                    duration_s=round(time.monotonic() - t0, 1),
+                    error="session expired",
+                ))
+                for rp in projects[projects.index(project):]:
+                    for rn in export_names:
+                        if rp == project and export_names.index(rn) <= export_names.index(name):
+                            continue
+                        results.append(Result(
+                            project=rp, export=rn, status="skipped",
+                            error="aborted: session expired",
+                        ))
+                return results
             except Exception as exc:  # noqa: BLE001 - per-item isolation is the point
                 log(f"  [FAIL] {project}/{name}: {exc}")
                 results.append(Result(
@@ -78,6 +97,8 @@ def build_manifest(
     started: str,
 ) -> dict[str, Any]:
     ok = sum(1 for r in results if r.status == "ok")
+    failed = sum(1 for r in results if r.status == "failed")
+    skipped = sum(1 for r in results if r.status == "skipped")
     return {
         "run_id": run_ts,
         "customer": customer,
@@ -86,7 +107,8 @@ def build_manifest(
         "summary": {
             "total": len(results),
             "ok": ok,
-            "failed": len(results) - ok,
+            "failed": failed,
+            "skipped": skipped,
         },
         "results": [asdict(r) for r in results],
     }
@@ -107,8 +129,12 @@ def print_summary(results: list[Result], log: Callable[[str], None] = print) -> 
     for r in results:
         if r.status == "ok":
             log(f"  [OK]   {r.project:22s} {r.export:10s} {Path(r.file).name}")
+        elif r.status == "skipped":
+            log(f"  [SKIP] {r.project:22s} {r.export:10s} {r.error}")
         else:
             log(f"  [FAIL] {r.project:22s} {r.export:10s} {r.error}")
     ok = sum(1 for r in results if r.status == "ok")
+    failed = sum(1 for r in results if r.status == "failed")
+    skipped = sum(1 for r in results if r.status == "skipped")
     log("")
-    log(f"  {ok} ok, {len(results) - ok} failed, {len(results)} total")
+    log(f"  {ok} ok, {failed} failed, {skipped} skipped, {len(results)} total")

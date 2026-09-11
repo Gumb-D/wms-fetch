@@ -2,6 +2,7 @@
 .env
 cookies.txt
 cookies_meta.txt
+wms_cookies.json
 
 # --- runtime output ---
 downloads/

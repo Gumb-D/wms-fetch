@@ -33,10 +33,26 @@ copy .env.example .env        # then fill in WMS_EMP_NO
 Log into WMS in a browser, copy the `Cookie` request header, and save it as a
 single line in `cookies.txt` (gitignored).
 
+### Chrome transport
+
+The current WMS portal binds API access to browser state; exporting its Cookie
+header alone can still return `login expired`. The recommended live mode runs
+`fetch()` through an authenticated same-origin Inventory Query tab over CDP:
+
+```
+python -m wms_fetch.cli --transport chrome --cdp-port 19222
+```
+
+Open WMS from the SCM portal first, then open Inventory Query in its own tab.
+The default target fragment is that page. Override it with `--cdp-target` when
+needed. Chrome must have remote debugging enabled and the repository CDP client
+must exist at `C:\dev\aida-chrome\cdp\cdp.mjs` (or set `WMS_CDP_SCRIPT`).
+
 ## Usage
 
 ```
-python -m wms_fetch.cli                      # all projects, all exports
+python -m wms_fetch.cli --transport chrome   # use logged-in Chrome (recommended)
+python -m wms_fetch.cli                      # copied-cookie requests transport
 python -m wms_fetch.cli --list               # show what would run
 python -m wms_fetch.cli --dry-run            # print requests, no network
 python -m wms_fetch.cli --project P..._D002  # one project

@@ -130,11 +130,53 @@ def _extract_guid(resp: requests.Response) -> str | None:
     return m.group(0) if m else None
 
 
-def _is_file_response(content_type: str, content_disposition: str) -> bool:
+class SessionExpired(RuntimeError):
+    """WMS rejected the session. Fatal for the whole run, not just one export.
+
+    WMS answers an expired session with HTTP 200 and a short Chinese body
+    ("login expired, token auth failed, please log in again"), so status code
+    alone cannot detect it. Raised as its own type so the runner aborts the
+    batch instead of burning the 240s poll timeout on every remaining export.
+    """
+
+
+_EXPIRED_MARKERS = ("\u767b\u5f55\u8fc7\u671f", "Token\u8ba4\u8bc1\u5931\u8d25",
+                    "\u8bf7\u91cd\u65b0\u767b\u5f55")
+
+
+def _safe(text: str, limit: int = 200) -> str:
+    """Console-safe excerpt of server text.
+
+    Windows consoles default to cp1252; repr() does NOT escape CJK, so logging
+    a Chinese error message raises UnicodeEncodeError and hides the real error.
+    """
+    return text[:limit].encode("ascii", "backslashreplace").decode("ascii")
+
+
+def _looks_expired(body: bytes, content_type: str = "") -> bool:
+    text = body.decode("utf-8", "replace")
+    if any(m in text for m in _EXPIRED_MARKERS):
+        return True
+    low = text.lower()
+    if "html" in content_type.lower() and ("login" in low or "sso" in low):
+        return True
+    return False
+
+
+def _is_file_response(
+    content_type: str, content_disposition: str, body: bytes = b""
+) -> bool:
     if "filename" in content_disposition.lower():
         return True
     ct = content_type.lower()
-    return any(t in ct for t in ("excel", "spreadsheet", "octet-stream"))
+    if any(t in ct for t in ("excel", "spreadsheet", "octet-stream")):
+        return True
+    # Legacy WMS does not expose Content-Disposition to browser fetch. Detect
+    # standard XLS (OLE) and XLSX/ZIP containers by their byte signatures.
+    return (
+        body.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")
+        or body.startswith(b"PK\x03\x04")
+    )
 
 
 def _is_pending_json(body: bytes) -> bool:
@@ -199,9 +241,20 @@ def step1_generate(session: requests.Session, cfg: ExportConfig, log=print) -> s
     if resp.status_code != 200:
         raise RuntimeError(f"step1: HTTP {resp.status_code}")
 
+    if _looks_expired(resp.content, resp.headers.get("Content-Type", "")):
+        raise SessionExpired(
+            "WMS session expired or token rejected - refresh cookies.txt"
+        )
+
     excel_id = _extract_guid(resp)
     if not excel_id:
-        raise RuntimeError(f"step1: no ExcelID in response: {resp.text[:200]!r}")
+        try:
+            envelope = resp.json()
+        except ValueError:
+            envelope = {}
+        error = envelope.get("ErrMsg") if isinstance(envelope, dict) else None
+        detail = f"WMS error {error}" if error not in (None, "") else _safe(resp.text)
+        raise RuntimeError(f"step1: no ExcelID in response: {detail}")
     log(f"        ExcelID = {excel_id}")
     return excel_id
 
@@ -237,7 +290,7 @@ def step2_download(
 
         if resp.status_code != 200:
             raise RuntimeError(f"step2: HTTP {resp.status_code}")
-        if _is_file_response(ct, cd):
+        if _is_file_response(ct, cd, resp.content):
             log(f"        ready on attempt {attempt} ({ct})")
             break
 
@@ -252,7 +305,14 @@ def step2_download(
             time.sleep(POLL_INTERVAL_S)
             continue
 
-        raise RuntimeError(f"step2: unexpected response (ct={ct!r}): {body[:200]!r}")
+        if _looks_expired(body, ct):
+            raise SessionExpired(
+                "WMS session expired mid-download - refresh cookies.txt"
+            )
+        raise RuntimeError(
+            f"step2: unexpected response (ct={ct!r}): "
+            f"{_safe(body.decode('utf-8', 'replace'))}"
+        )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / output_filename(cfg, _parse_filename(cd), ts)
@@ -268,9 +328,9 @@ def step2_download(
     if total < 4096:
         head = out.read_bytes()[:32].lower()
         if b"<html" in head or b"<!doctype" in head:
-            raise RuntimeError(
-                f"step2: server returned an HTML page, not a file "
-                f"(saved {out.name}); cookies may be stale"
+            raise SessionExpired(
+                f"step2: server returned an HTML login page, not a file "
+                f"(saved {out.name}) - refresh cookies.txt"
             )
     return out
 

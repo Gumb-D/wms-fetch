@@ -134,6 +134,17 @@ class TestProjectFieldMapping(unittest.TestCase):
             exports.build("nope", PROJ)
 
 
+class TestFileDetection(unittest.TestCase):
+    def test_detects_xls_signature_without_headers(self):
+        body = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1" + b"rest"
+        self.assertTrue(_base._is_file_response("", "", body))
+
+    def test_detects_xlsx_signature_without_headers(self):
+        self.assertTrue(_base._is_file_response("", "", b"PK\x03\x04rest"))
+
+    def test_json_is_not_a_file(self):
+        self.assertFalse(_base._is_file_response("", "", b'{"Succeed":true}'))
+
 class TestFilenames(unittest.TestCase):
     def test_filename_is_unique_per_project(self):
         ts = "20260911_150000"
@@ -223,7 +234,7 @@ class TestBatch(unittest.TestCase):
         self.assertTrue(all(r.export == "lock" for r in bad))
 
         m = build_manifest(results, "CelcomDigi", "ts", "now")
-        self.assertEqual(m["summary"], {"total": 4, "ok": 2, "failed": 2})
+        self.assertEqual(m["summary"], {"total": 4, "ok": 2, "failed": 2, "skipped": 0})
 
 
 class TestProjectFile(unittest.TestCase):

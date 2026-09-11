@@ -43,6 +43,18 @@ def parse_args(argv=None):
         help=f"Where to write files. Default: {config.OUTPUT_DIR}",
     )
     p.add_argument(
+        "--transport", choices=("requests", "chrome"), default="requests",
+        help="HTTP transport. chrome uses the logged-in WMS tab through CDP.",
+    )
+    p.add_argument(
+        "--cdp-port", type=int, default=19222,
+        help="Chrome DevTools port used by --transport chrome (default: 19222).",
+    )
+    p.add_argument(
+        "--cdp-target", default=None,
+        help="URL/title fragment of an authenticated same-origin WMS page.",
+    )
+    p.add_argument(
         "--skip-auth-check", action="store_true",
         help="Trust cookies.txt as-is and skip the validity probe.",
     )
@@ -70,7 +82,17 @@ def do_dry_run(project_set, projects, export_names) -> int:
     return 0
 
 
+def _force_utf8_console() -> None:
+    """Let logs carry WMS's Chinese server messages on a cp1252 console."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv=None) -> int:
+    _force_utf8_console()
     args = parse_args(argv)
 
     try:
@@ -104,21 +126,28 @@ def main(argv=None) -> int:
     if args.dry_run:
         return do_dry_run(project_set, projects, export_names)
 
-    try:
-        cookie_header = auth.load_cookie_header()
-    except (FileNotFoundError, ValueError) as exc:
-        print(f"[auth] {exc}", file=sys.stderr)
-        return 2
-
-    session = auth.build_session(cookie_header)
+    if args.transport == "chrome":
+        try:
+            from .chrome_session import ChromeSession
+            session = ChromeSession(port=args.cdp_port, target=args.cdp_target)
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            print(f"[chrome] {exc}", file=sys.stderr)
+            return 2
+    else:
+        try:
+            cookie_header = auth.load_cookie_header()
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"[auth] {exc}", file=sys.stderr)
+            return 2
+        session = auth.build_session(cookie_header)
 
     if not args.skip_auth_check:
         print("Checking cookies...")
         if not auth.cookies_are_valid(session):
             print(
-                "[auth] cookies are expired or invalid.\n"
-                "       Log into WMS in a browser, copy the Cookie request "
-                f"header, and save it to {config.COOKIES_FILE}",
+                "[auth] WMS session is expired or invalid.\n"
+                "       For requests transport, refresh cookies.txt. For Chrome "
+                "transport, log in and open Inventory Query in its own tab.",
                 file=sys.stderr,
             )
             return 2
