@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .. import config
-from ._base import ExportConfig
+from ._base import ExportConfig, wms_project_no
 
 ENDPOINT = "/scm/WMS/WMS_CN809/InventoryManagement/JsonService/InventoryQueryJsonService.ashx"
 REFERER = "/SCM/WMS/WMS_CN809/InventoryManagement/InventoryQuery.aspx"
@@ -77,8 +77,11 @@ def build_config(project_no: str, country_code: str | None = None) -> ExportConf
             "WHtype": WHTYPE,
         },
         body=body,
+        # WMS stores these CelcomDigi identifiers without the delivery
+        # suffix.  The suffix is a delivery-designator, not part of the
+        # Pre-Sales Project No filter value.
         project_fields={
-            "taPreSalesProjNo": project_no,
-            "taPreSalesProjNoMulti": project_no,
+            "taPreSalesProjNo": wms_project_no(project_no),
+            "taPreSalesProjNoMulti": wms_project_no(project_no),
         },
     )

@@ -27,6 +27,7 @@ class Result:
     file: str | None = None
     bytes: int | None = None
     duration_s: float | None = None
+    query_project: str | None = None
     error: str | None = None
 
 

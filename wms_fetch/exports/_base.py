@@ -35,6 +35,20 @@ GUID_RE = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
 
+DELIVERY_SUFFIX_RE = re.compile(r"^(?P<base>.+)_D\d{3}$", re.IGNORECASE)
+
+
+def wms_project_no(project_no: str) -> str:
+    """Normalize a delivery-designated code to WMS's indexed project code.
+
+    WMS's project fields index the base code.  The customer-facing ``_Dnnn``
+    suffix identifies a delivery/design variant but is not stored in those
+    WMS fields; sending it returns a successful zero-row response.
+    """
+    value = project_no.strip()
+    match = DELIVERY_SUFFIX_RE.fullmatch(value)
+    return match.group("base") if match else value
+
 # The step-2 GET is racy: step 1 returns the ExcelID *before* the server has
 # finished flushing the file. Small exports are ready on the first GET; a
 # 25MB inventory pull often is not, and the server answers

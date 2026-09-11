@@ -9,7 +9,7 @@ parameter, and there is no CardNo.
 from __future__ import annotations
 
 from .. import config
-from ._base import ExportConfig
+from ._base import ExportConfig, wms_project_no
 
 ENDPOINT = "/scm/WMS/WMS_CN809/InventoryLock/JsonService/InventoryLockQueryJsonService.ashx"
 REFERER = "/SCM/WMS/WMS_CN809/InventoryLock/InventoryLockQuery.aspx"
@@ -41,5 +41,5 @@ def build_config(project_no: str, country_code: str | None = None) -> ExportConf
             "Code": country,
         },
         body=body,
-        project_fields={"ItemNum": project_no},
+        project_fields={"ItemNum": wms_project_no(project_no)},
     )

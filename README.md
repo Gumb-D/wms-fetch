@@ -51,7 +51,8 @@ must exist at `C:\dev\aida-chrome\cdp\cdp.mjs` (or set `WMS_CDP_SCRIPT`).
 ## Usage
 
 ```
-python -m wms_fetch.cli --transport chrome   # use logged-in Chrome (recommended)
+python -m wms_fetch.cli --transport chrome   # legacy XLS export via logged-in Chrome
+python -m wms_fetch.cli --transport chrome --mode api  # direct JSON API (recommended)
 python -m wms_fetch.cli                      # copied-cookie requests transport
 python -m wms_fetch.cli --list               # show what would run
 python -m wms_fetch.cli --dry-run            # print requests, no network
@@ -66,9 +67,10 @@ Exit codes: `0` all succeeded, `1` partial (good files still written),
 
 ```
 output/
-  P202211283695_D002_inventory_20260911_150000.xls
-  P202211283695_D002_transfer_20260911_150000.xls
-  P202211283695_D002_lock_20260911_150000.xls
+  P202211283695_D002_inventory_20260911_150000.xls   # --mode excel
+  P202211283695_D002_inventory_20260911_150000.json  # --mode api
+  P202211283695_D002_transfer_20260911_150000.json
+  P202211283695_D002_lock_20260911_150000.json
   ...
   manifest_20260911_150000.json
 ```
@@ -98,19 +100,40 @@ logs.
 
 | Export    | Endpoint page       | WHtype   | Project number field |
 |-----------|---------------------|----------|----------------------|
-| inventory | InventoryQuery      | 10,40,60 | `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
-| transfer  | InventoryQuery      | 50       | `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
+| inventory | InventoryQuery      | 10,40,60 | base code in `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
+| transfer  | InventoryQuery      | 50       | base code in `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
 | lock      | InventoryLockQuery  | n/a      | `ItemNum` |
 
 Lock also uses `Code=` rather than `CountryCode=`, adds a `URL=` param, sends
 no `CardNo`, and triggers `btnExport` instead of `btnExportDetail`.
 
-> **Unverified:** the reference project filtered on `taPreSalesProjNo` using a
-> bare `P############` value. The CelcomDigi numbers carry `_D00n` suffixes and
-> one (`20130426020000_D006`) has no `P` prefix, so they may belong in
-> `taProjectNo` / `taProjectNoMulti` instead. A wrong field yields an empty
-> export rather than an error. Confirm against one project before trusting a
-> full run; switching is a one-line change to `project_fields`.
+> **Verified against the live WMS JSON query API:** the CelcomDigi codes are
+> delivery-designated values. WMS matches the base values
+> `P202211283695`, `P202202168750`, and `20130426020000` in
+> `taPreSalesProjNo` / `taPreSalesProjNoMulti`; including `_D001`/`_D002`/`_D006`
+> returns zero rows. `taProjectNo` returns zero rows for these values. The
+> extractor therefore strips the final `_Dnnn` suffix before sending the WMS
+> filter, while retaining the full code in output filenames and manifests.
+
+
+### Direct API mode
+
+The recommended live mode calls the same authenticated JSON paging endpoints
+used by the WMS Query buttons, instead of waiting for Excel generation. It is
+still server-bound for large datasets: a 36,910-row inventory query took about
+4.5 minutes on the live WMS instance, but it avoids the extra Excel build and
+file-download stage:
+
+```
+python -m wms_fetch.cli --transport chrome --mode api \
+  --cdp-target "MessagerID=..."
+```
+
+It writes JSON datasets containing the full delivery code, the normalized
+`query_project`, row totals, paging metadata and `rows`. The `_Dnnn` suffix is
+kept in filenames/manifests but removed from the WMS filter because the live
+API returns zero rows when that suffix is sent. Duplicate base-code queries are
+cached and copied to each requested delivery-code output.
 
 ## Tests
 

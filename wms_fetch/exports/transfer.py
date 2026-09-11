@@ -7,7 +7,7 @@ differs, so the inventory body is reused to keep the two in sync.
 from __future__ import annotations
 
 from .. import config
-from ._base import ExportConfig
+from ._base import ExportConfig, wms_project_no
 from .inventory import BASE_BODY, ENDPOINT, REFERER
 
 WHTYPE = "50"
@@ -31,7 +31,7 @@ def build_config(project_no: str, country_code: str | None = None) -> ExportConf
         },
         body=body,
         project_fields={
-            "taPreSalesProjNo": project_no,
-            "taPreSalesProjNoMulti": project_no,
+            "taPreSalesProjNo": wms_project_no(project_no),
+            "taPreSalesProjNoMulti": wms_project_no(project_no),
         },
     )

@@ -47,6 +47,14 @@ def parse_args(argv=None):
         help="HTTP transport. chrome uses the logged-in WMS tab through CDP.",
     )
     p.add_argument(
+        "--mode", choices=("excel", "api"), default="excel",
+        help="excel=legacy XLS export; api=direct JSON paging (faster).",
+    )
+    p.add_argument(
+        "--api-page-size", type=int, default=3000,
+        help="Rows per API request; WMS accepts up to 3000 (default: 3000).",
+    )
+    p.add_argument(
         "--cdp-port", type=int, default=19222,
         help="Chrome DevTools port used by --transport chrome (default: 19222).",
     )
@@ -115,12 +123,18 @@ def main(argv=None) -> int:
     print(f"Customer : {project_set.customer}")
     print(f"Projects : {len(projects)}  ({', '.join(projects)})")
     print(f"Exports  : {', '.join(export_names)}")
-    print(f"Planned  : {len(projects) * len(export_names)} downloads")
+    print(f"Mode     : {args.mode}")
+    unit = "API datasets" if args.mode == "api" else "downloads"
+    print(f"Planned  : {len(projects) * len(export_names)} {unit}")
 
     try:
         config.require_emp_no()
     except RuntimeError as exc:
         print(f"[config] {exc}", file=sys.stderr)
+        return 2
+
+    if args.api_page_size < 1 or args.api_page_size > 3000:
+        print("[config] --api-page-size must be between 1 and 3000", file=sys.stderr)
         return 2
 
     if args.dry_run:
@@ -157,14 +171,26 @@ def main(argv=None) -> int:
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     started = datetime.now().isoformat(timespec="seconds")
 
-    results = run_batch(
-        session=session,
-        projects=projects,
-        export_names=export_names,
-        out_dir=out_dir,
-        country_code=project_set.country_code,
-        run_ts=run_ts,
-    )
+    if args.mode == "api":
+        from .api import run_api_batch
+        results = run_api_batch(
+            session=session,
+            projects=projects,
+            export_names=export_names,
+            out_dir=out_dir,
+            country_code=project_set.country_code,
+            page_size=args.api_page_size,
+            run_ts=run_ts,
+        )
+    else:
+        results = run_batch(
+            session=session,
+            projects=projects,
+            export_names=export_names,
+            out_dir=out_dir,
+            country_code=project_set.country_code,
+            run_ts=run_ts,
+        )
 
     print_summary(results)
     manifest = build_manifest(results, project_set.customer, run_ts, started)

@@ -90,12 +90,12 @@ def pending_response():
 class TestProjectFieldMapping(unittest.TestCase):
     def test_inventory_uses_presales_fields(self):
         body = _base.merge_filters(exports.build("inventory", PROJ))
-        self.assertEqual(body["taPreSalesProjNo"], PROJ)
-        self.assertEqual(body["taPreSalesProjNoMulti"], PROJ)
+        self.assertEqual(body["taPreSalesProjNo"], "P202211283695")
+        self.assertEqual(body["taPreSalesProjNoMulti"], "P202211283695")
 
     def test_lock_uses_itemnum(self):
         body = _base.merge_filters(exports.build("lock", PROJ))
-        self.assertEqual(body["ItemNum"], PROJ)
+        self.assertEqual(body["ItemNum"], "P202211283695")
         self.assertNotIn("taPreSalesProjNo", body)
 
     def test_transfer_is_whtype_50(self):
@@ -126,7 +126,7 @@ class TestProjectFieldMapping(unittest.TestCase):
             cfg = exports.build("inventory", PROJ)
             cfg.filters_file = f
             body = _base.merge_filters(cfg)
-            self.assertEqual(body["taPreSalesProjNo"], PROJ)   # project wins
+            self.assertEqual(body["taPreSalesProjNo"], "P202211283695")   # normalized project wins
             self.assertEqual(body["taCostomerName"], "CelcomDigi")  # other keys apply
 
     def test_unknown_export_rejected(self):
