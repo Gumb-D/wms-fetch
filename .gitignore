@@ -11,8 +11,17 @@ logs/
 manifest*.json
 _chat_dump.txt
 
-# --- reference bundle: contains live session cookies, keep local only ---
-reference/
+# --- reference source ---
+# Keep source and sanitized configuration templates; never commit live session state.
+reference/**/cookies.txt
+reference/**/cookies_meta.txt
+reference/**/wms_*_export.txt
+reference/**/logs/
+reference/**/__pycache__/
+reference/**/.claude/
+reference/**/.env
+reference/**/.env.*
+!reference/**/.env.redacted
 
 # --- python ---
 __pycache__/
