@@ -1,0 +1,20 @@
+# --- secrets / local state (never commit) ---
+.env
+cookies.txt
+cookies_meta.txt
+
+# --- runtime output ---
+downloads/
+output/
+logs/
+manifest*.json
+_chat_dump.txt
+
+# --- reference bundle: contains live session cookies, keep local only ---
+reference/
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/

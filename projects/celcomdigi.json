@@ -1,0 +1,11 @@
+{
+  "customer": "CelcomDigi",
+  "country_code": "MY",
+  "exports": ["inventory", "transfer", "lock"],
+  "projects": [
+    "P202211283695_D002",
+    "P202211283695_D001",
+    "P202202168750_D002",
+    "20130426020000_D006"
+  ]
+}
