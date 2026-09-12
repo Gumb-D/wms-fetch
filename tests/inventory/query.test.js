@@ -77,6 +77,37 @@ describe("inventory queries", () => {
     );
   });
 
+  test("clamps derived availability per item before summing a family", () => {
+    const perItem = structuredClone(snapshot);
+    const template = perItem.records.find(
+      (row) => row.sourceType === "inventory",
+    );
+    perItem.records = [
+      {
+        ...template,
+        sourceType: "inventory",
+        itemCode: "RRU-A",
+        quantity: "5",
+        availableQuantity: null,
+      },
+      {
+        ...template,
+        sourceType: "lock",
+        itemCode: "RRU-A",
+        quantity: "10",
+        availableQuantity: null,
+      },
+      {
+        ...template,
+        sourceType: "inventory",
+        itemCode: "RRU-B",
+        quantity: "10",
+        availableQuantity: null,
+      },
+    ];
+    expect(queryInventory({ term: "RRU" }, perItem).availableNow).toBe("10");
+  });
+
   test("returns ambiguity instead of adding materially different product families", () => {
     const ambiguous = structuredClone(snapshot);
     ambiguous.records.push({

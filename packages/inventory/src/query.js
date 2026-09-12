@@ -8,6 +8,26 @@ const baseCode = (code) =>
     .replace(/_D\d+$/i, "")
     .toUpperCase();
 
+const availableByItem = (rows) => {
+  const itemCodes = [...new Set(rows.map((row) => row.itemCode))];
+  return itemCodes.reduce((total, itemCode) => {
+    const itemRows = rows.filter((row) => row.itemCode === itemCode);
+    const inventoryRows = itemRows.filter(
+      (row) => row.sourceType === "inventory",
+    );
+    if (!inventoryRows.length) return total;
+    const available = inventoryRows.every(
+      (row) =>
+        row.availableQuantity !== null && row.availableQuantity !== undefined,
+    )
+      ? sum(inventoryRows.map((row) => ({ quantity: row.availableQuantity })))
+      : sum(inventoryRows).minus(
+          sum(itemRows.filter((row) => row.sourceType === "lock")),
+        );
+    return total.plus(Decimal.max(available, 0));
+  }, new Decimal(0));
+};
+
 export function queryInventory(query, snapshot, options = {}) {
   const projects = new Set(
     (query.projectCodes ?? query.project_codes ?? []).map(baseCode),
@@ -44,8 +64,6 @@ export function queryInventory(query, snapshot, options = {}) {
     ...new Set(matching.map((r) => baseCode(r.baseProjectCode))),
   ].sort()) {
     const rows = matching.filter((r) => baseCode(r.baseProjectCode) === base);
-    const inventoryRows = rows.filter((r) => r.sourceType === "inventory");
-    const onHand = sum(inventoryRows);
     const locked = sum(rows.filter((r) => r.sourceType === "lock"));
     const transfer = sum(rows.filter((r) => r.sourceType === "transfer"));
     summaries.push({
@@ -53,16 +71,7 @@ export function queryInventory(query, snapshot, options = {}) {
       requestedDeliveryCodes: [
         ...new Set(rows.flatMap((r) => r.requestedDeliveryCodes)),
       ].sort(),
-      availableNow:
-        inventoryRows.length > 0 &&
-        inventoryRows.every(
-          (r) =>
-            r.availableQuantity !== null && r.availableQuantity !== undefined,
-        )
-          ? sum(
-              inventoryRows.map((r) => ({ quantity: r.availableQuantity })),
-            ).toString()
-          : Decimal.max(onHand.minus(locked), 0).toString(),
+      availableNow: availableByItem(rows).toString(),
       locked: locked.toString(),
       inTransfer: transfer.toString(),
     });
