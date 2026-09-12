@@ -3,7 +3,10 @@ import { matchesTerm, normalizeTerm } from "./catalog.js";
 
 const sum = (rows) =>
   rows.reduce((total, row) => total.plus(row.quantity), new Decimal(0));
-const baseCode = (code) => String(code).replace(/_D\d+$/i, "");
+const baseCode = (code) =>
+  String(code)
+    .replace(/_D\d+$/i, "")
+    .toUpperCase();
 
 export function queryInventory(query, snapshot, options = {}) {
   const projects = new Set(
@@ -12,7 +15,7 @@ export function queryInventory(query, snapshot, options = {}) {
   const region = query.region ? normalizeTerm(query.region) : null;
   const matching = snapshot.records.filter(
     (row) =>
-      (!projects.size || projects.has(row.baseProjectCode)) &&
+      (!projects.size || projects.has(baseCode(row.baseProjectCode))) &&
       (!region || normalizeTerm(row.region ?? "") === region) &&
       matchesTerm(row, query.term, options.aliases),
   );

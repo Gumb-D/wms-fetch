@@ -38,6 +38,14 @@ describe("inventory queries", () => {
     expect(result.availableNow).toBe("88");
   });
 
+  test("matches lowercase project filters against uppercase snapshot codes", () => {
+    const result = queryInventory(
+      { term: "RRU", projectCodes: ["p1_d002"] },
+      snapshot,
+    );
+    expect(result.availableNow).toBe("88");
+  });
+
   test("healthy no-match is a genuine zero result", () => {
     expect(queryInventory({ term: "NOT-THERE" }, snapshot)).toMatchObject({
       availableNow: "0",

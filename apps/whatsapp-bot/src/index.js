@@ -4,7 +4,7 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
-import { createMessageHandler } from "./adapter.js";
+import { createMessageHandler, handleUpsert } from "./adapter.js";
 import { createInventoryClient } from "./inventory-client.js";
 import { acquireKeepAwake } from "@wms/runtime/keep-awake";
 
@@ -44,22 +44,13 @@ async function connect(delay = 0) {
     query: createInventoryClient({ baseUrl: process.env.INVENTORY_API_URL }),
   });
   socket.ev.on("creds.update", saveCreds);
-  socket.ev.on("messages.upsert", async ({ messages }) => {
-    for (const raw of messages) {
-      const chatId = raw.key.remoteJid;
-      const senderId = raw.key.participant ?? chatId;
-      const text =
-        raw.message?.conversation ?? raw.message?.extendedTextMessage?.text;
-      const reply = await handler({
-        id: raw.key.id,
-        chatId,
-        senderId,
-        text,
-        fromMe: raw.key.fromMe,
-      });
-      if (reply) await socket.sendMessage(chatId, { text: reply });
-    }
-  });
+  socket.ev.on("messages.upsert", (upsert) =>
+    handleUpsert(upsert, {
+      handler,
+      sendText: (destination, text) =>
+        socket.sendMessage(destination, { text }),
+    }),
+  );
   socket.ev.on("connection.update", ({ connection, lastDisconnect }) => {
     if (
       connection === "close" &&

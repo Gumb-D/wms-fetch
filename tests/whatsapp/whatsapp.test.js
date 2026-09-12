@@ -1,7 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 import { authorize } from "../../apps/whatsapp-bot/src/authorization.js";
 import { parseInventoryQuestion } from "../../apps/whatsapp-bot/src/parser.js";
-import { createMessageHandler } from "../../apps/whatsapp-bot/src/adapter.js";
+import {
+  createMessageHandler,
+  handleUpsert,
+} from "../../apps/whatsapp-bot/src/adapter.js";
 import { formatInventoryReply } from "../../apps/whatsapp-bot/src/formatter.js";
 import { createInventoryClient } from "../../apps/whatsapp-bot/src/inventory-client.js";
 
@@ -105,5 +108,21 @@ describe("WhatsApp boundary", () => {
       text: "stock radio",
     });
     expect(reply).toContain("Radio Cabinet, Radio Remote Unit");
+  });
+
+  test("ignores history and append upserts after reconnect", async () => {
+    const handler = vi.fn();
+    const sendText = vi.fn();
+    await handleUpsert(
+      {
+        type: "append",
+        messages: [
+          { key: { id: "old" }, message: { conversation: "stock RRU" } },
+        ],
+      },
+      { handler, sendText },
+    );
+    expect(handler).not.toHaveBeenCalled();
+    expect(sendText).not.toHaveBeenCalled();
   });
 });
