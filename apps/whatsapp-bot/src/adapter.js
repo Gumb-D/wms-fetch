@@ -21,7 +21,10 @@ export function createMessageHandler({ rules, query, maxRemembered = 2000 }) {
       return formatInventoryReply(await query(parsed));
     } catch (error) {
       return formatInventoryReply({
-        error: { code: error.code ?? "API_UNAVAILABLE" },
+        error: {
+          code: error.code ?? "API_UNAVAILABLE",
+          candidates: error.candidates,
+        },
       });
     }
   };

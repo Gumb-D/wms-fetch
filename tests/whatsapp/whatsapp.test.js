@@ -3,6 +3,7 @@ import { authorize } from "../../apps/whatsapp-bot/src/authorization.js";
 import { parseInventoryQuestion } from "../../apps/whatsapp-bot/src/parser.js";
 import { createMessageHandler } from "../../apps/whatsapp-bot/src/adapter.js";
 import { formatInventoryReply } from "../../apps/whatsapp-bot/src/formatter.js";
+import { createInventoryClient } from "../../apps/whatsapp-bot/src/inventory-client.js";
 
 describe("WhatsApp boundary", () => {
   test.each([
@@ -78,5 +79,31 @@ describe("WhatsApp boundary", () => {
     expect(text).toContain("RRU available now: 88 units");
     expect(text).toContain("Data updated:");
     expect(text).not.toContain("stack");
+  });
+
+  test("preserves ambiguity candidates from API through the handler", async () => {
+    const query = createInventoryClient({
+      fetchImpl: async () => ({
+        ok: false,
+        json: async () => ({
+          error: {
+            code: "AMBIGUOUS_TERM",
+            message: "ambiguous",
+            candidates: ["Radio Cabinet", "Radio Remote Unit"],
+          },
+        }),
+      }),
+    });
+    const handler = createMessageHandler({
+      rules: { senders: ["ok@s.whatsapp.net"], groups: [] },
+      query,
+    });
+    const reply = await handler({
+      id: "ambiguous",
+      chatId: "ok@s.whatsapp.net",
+      senderId: "ok@s.whatsapp.net",
+      text: "stock radio",
+    });
+    expect(reply).toContain("Radio Cabinet, Radio Remote Unit");
   });
 });

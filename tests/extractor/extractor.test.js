@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   baseProjectCode,
+  buildPagingParams,
   fetchDataset,
   runExtraction,
 } from "../../apps/extractor/src/wms-client.js";
@@ -29,6 +30,39 @@ describe("JavaScript extraction parity", () => {
       fetched_rows: 3,
       pages: 2,
     });
+  });
+
+  test("includes every context parameter required by WMS paging", () => {
+    expect(
+      buildPagingParams({
+        sourceType: "inventory",
+        page: 1,
+        pageSize: 3000,
+        employeeNo: "123",
+        countryCode: "MY",
+      }),
+    ).toMatchObject({
+      CustomData: "",
+      PageSourceID: "",
+      EmployeeToken: "null",
+      EmployeeCnName: "null",
+      EmployeeEnName: "null",
+    });
+  });
+
+  test("aborts when a positive-total page makes no progress", async () => {
+    const pages = [
+      { Succeed: true, Data: { total: 3, rows: [{ id: 1 }, { id: 2 }] } },
+      { Succeed: true, Data: { total: 3, rows: [] } },
+    ];
+    await expect(
+      fetchDataset({
+        project: "P1",
+        sourceType: "inventory",
+        pageSize: 2,
+        requestPage: async () => pages.shift(),
+      }),
+    ).rejects.toMatchObject({ code: "EMPTY_PAGE" });
   });
 
   test("reuses identical base-project datasets and preserves delivery outputs", async () => {

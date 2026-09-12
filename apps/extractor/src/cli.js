@@ -7,7 +7,7 @@ import {
 import { acquireRunLock } from "@wms/runtime/run-lock";
 import { runtimeStatus } from "@wms/runtime/status";
 import { createCdpRequester } from "./cdp.js";
-import { runExtraction } from "./wms-client.js";
+import { buildPagingParams, runExtraction } from "./wms-client.js";
 
 try {
   process.loadEnvFile();
@@ -114,22 +114,13 @@ async function extract() {
             taPreSalesProjNoMulti: project,
             ckbWarehouseType: c.warehouse,
           };
-    const params = {
-      CommandName: "Paging",
-      PageNum: String(page),
-      PageSize: String(pageSize),
-      GridID: c.grid,
-      DataGridId: c.grid,
-      CommandControl: "btnQuery",
-      CommandEvent: "click",
-      EmployeeNo: "null",
-      LanguageID: "1033",
-      SystemName: "null",
-    };
-    if (sourceType === "lock") {
-      params.Code = projectConfig.country_code;
-      params.URL = c.referer;
-    } else params.CardNo = process.env.WMS_EMP_NO;
+    const params = buildPagingParams({
+      sourceType,
+      page,
+      pageSize,
+      employeeNo: process.env.WMS_EMP_NO,
+      countryCode: projectConfig.country_code,
+    });
     return cdp({
       url: `https://scm.zte.com.cn${c.endpoint}`,
       params,

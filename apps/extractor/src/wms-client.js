@@ -1,6 +1,39 @@
 const MAX_PAGE_SIZE = 3000;
 export const baseProjectCode = (code) => String(code).replace(/_D\d+$/i, "");
 
+export function buildPagingParams({
+  sourceType,
+  page,
+  pageSize,
+  employeeNo,
+  countryCode,
+}) {
+  const lock = sourceType === "lock";
+  const grid = lock ? "DataGrid" : "dgInventoryDetail";
+  const params = {
+    CommandName: "Paging",
+    PageNum: String(page),
+    PageSize: String(pageSize),
+    GridID: grid,
+    CustomData: "",
+    CommandControl: "btnQuery",
+    CommandEvent: "click",
+    DataGridId: grid,
+    PageSourceID: "",
+    EmployeeNo: "null",
+    LanguageID: "1033",
+    SystemName: "null",
+    EmployeeToken: "null",
+    EmployeeCnName: "null",
+    EmployeeEnName: "null",
+  };
+  if (lock) {
+    params.URL = "/SCM/WMS/WMS_CN809/InventoryLock/InventoryLockQuery.aspx";
+    params.Code = countryCode;
+  } else params.CardNo = employeeNo;
+  return params;
+}
+
 export async function fetchDataset({
   project,
   sourceType,
@@ -39,6 +72,13 @@ export async function fetchDataset({
           `WMS total changed during paging: ${expectedTotal} -> ${total}`,
         ),
         { code: "TOTAL_CHANGED" },
+      );
+    if (expectedTotal > rows.length && payload.Data.rows.length === 0)
+      throw Object.assign(
+        new Error(
+          `${sourceType} page ${page} returned no rows before total was reached`,
+        ),
+        { code: "EMPTY_PAGE" },
       );
     rows.push(...payload.Data.rows);
     page += 1;

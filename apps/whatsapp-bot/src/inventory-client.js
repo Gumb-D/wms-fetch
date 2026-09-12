@@ -17,7 +17,7 @@ export function createInventoryClient({
         if (!response.ok)
           throw Object.assign(
             new Error(data.error?.message ?? "Inventory API failed"),
-            { code: data.error?.code },
+            { code: data.error?.code, candidates: data.error?.candidates },
           );
         return data;
       } catch (error) {
@@ -28,6 +28,7 @@ export function createInventoryClient({
     }
     throw Object.assign(new Error("Inventory service unavailable"), {
       code: lastError?.code ?? "API_UNAVAILABLE",
+      candidates: lastError?.candidates,
     });
   };
 }
