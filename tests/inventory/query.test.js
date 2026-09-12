@@ -108,6 +108,20 @@ describe("inventory queries", () => {
     expect(queryInventory({ term: "RRU" }, perItem).availableNow).toBe("10");
   });
 
+  test("joins lock and transfer quantities by matched item code", () => {
+    const labelVariant = structuredClone(snapshot);
+    for (const row of labelVariant.records.filter(
+      (row) => row.sourceType !== "inventory",
+    )) {
+      row.product = "Legacy system label";
+      row.alias = null;
+    }
+    const result = queryInventory({ term: "Radio Remote" }, labelVariant);
+    expect(result.availableNow).toBe("88");
+    expect(result.locked).toBe("12");
+    expect(result.inTransfer).toBe("18");
+  });
+
   test("returns ambiguity instead of adding materially different product families", () => {
     const ambiguous = structuredClone(snapshot);
     ambiguous.records.push({

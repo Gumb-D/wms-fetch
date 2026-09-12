@@ -7,6 +7,12 @@ import { datasetSchema, manifestSchema } from "@wms/contracts";
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const normalizeBaseProject = (value) => String(value).toUpperCase();
+const finiteQuantity = (value, file) => {
+  const quantity = new Decimal(value);
+  if (!quantity.isFinite())
+    throw fail("SCHEMA_MISMATCH", `Invalid quantity in ${path.basename(file)}`);
+  return quantity;
+};
 
 async function readJson(file) {
   try {
@@ -105,8 +111,15 @@ export async function buildSnapshot(batchDir, options = {}) {
     });
     const codes = [...new Set(deliveryCodes)].sort();
     for (const row of dataset.rows) {
+      let quantity;
+      let availableQuantity = null;
       try {
-        new Decimal(row.Quantity);
+        quantity = finiteQuantity(row.Quantity, file);
+        if (
+          dataset.export === "inventory" &&
+          row.AvailableQuantity !== undefined
+        )
+          availableQuantity = finiteQuantity(row.AvailableQuantity, file);
       } catch {
         throw fail(
           "SCHEMA_MISMATCH",
@@ -123,11 +136,8 @@ export async function buildSnapshot(batchDir, options = {}) {
         alias: row.Alias?.trim() || null,
         region: row.Region?.trim() || null,
         warehouse: row.Warehouse?.trim() || null,
-        quantity: new Decimal(row.Quantity).toString(),
-        availableQuantity:
-          dataset.export === "inventory" && row.AvailableQuantity !== undefined
-            ? new Decimal(row.AvailableQuantity).toString()
-            : null,
+        quantity: quantity.toString(),
+        availableQuantity: availableQuantity?.toString() ?? null,
       });
     }
   }

@@ -33,19 +33,21 @@ export function queryInventory(query, snapshot, options = {}) {
     (query.projectCodes ?? query.project_codes ?? []).map(baseCode),
   );
   const region = query.region ? normalizeTerm(query.region) : null;
-  const matching = snapshot.records.filter(
+  const scoped = snapshot.records.filter(
     (row) =>
       (!projects.size || projects.has(baseCode(row.baseProjectCode))) &&
-      (!region || normalizeTerm(row.region ?? "") === region) &&
-      matchesTerm(row, query.term, options.aliases),
+      (!region || normalizeTerm(row.region ?? "") === region),
+  );
+  const termMatches = scoped.filter((row) =>
+    matchesTerm(row, query.term, options.aliases),
   );
   const families = new Map();
   const aliasByItem = new Map(
-    matching
+    termMatches
       .filter((row) => row.alias)
       .map((row) => [row.itemCode, normalizeTerm(row.alias)]),
   );
-  for (const row of matching) {
+  for (const row of termMatches) {
     const family = aliasByItem.get(row.itemCode) || normalizeTerm(row.product);
     if (!families.has(family)) families.set(family, row.product);
   }
@@ -58,7 +60,9 @@ export function queryInventory(query, snapshot, options = {}) {
       },
     );
   }
-  const itemCodes = [...new Set(matching.map((r) => r.itemCode))].sort();
+  const itemCodes = [...new Set(termMatches.map((r) => r.itemCode))].sort();
+  const selectedItems = new Set(itemCodes);
+  const matching = scoped.filter((row) => selectedItems.has(row.itemCode));
   const summaries = [];
   for (const base of [
     ...new Set(matching.map((r) => baseCode(r.baseProjectCode))),

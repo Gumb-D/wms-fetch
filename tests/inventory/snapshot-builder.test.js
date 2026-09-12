@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
@@ -58,6 +58,29 @@ describe("verified inventory snapshots", () => {
       }),
     ).rejects.toMatchObject({ code: "INVALID_BATCH" });
   });
+
+  test.each(["NaN", "Infinity", "-Infinity"])(
+    "rejects non-finite quantity %s",
+    async (quantity) => {
+      const manifest = JSON.parse(
+        await readFile(
+          path.join(fixture, "manifest_20260911_150000.json"),
+          "utf8",
+        ),
+      );
+      const badDir = await mkdtemp(path.join(tmpdir(), "wms-bad-quantity-"));
+      for (const result of manifest.results) {
+        const source = path.join(fixture, path.basename(result.file));
+        const target = path.join(badDir, path.basename(result.file));
+        const dataset = JSON.parse(await readFile(source, "utf8"));
+        if (result === manifest.results[0]) dataset.rows[0].Quantity = quantity;
+        await writeFile(target, JSON.stringify(dataset));
+      }
+      await expect(buildSnapshot(badDir, { manifest })).rejects.toMatchObject({
+        code: "SCHEMA_MISMATCH",
+      });
+    },
+  );
 
   test("atomically publishes current pointer and immutable snapshot", async () => {
     const runtime = await mkdtemp(path.join(tmpdir(), "wms-snapshot-"));
