@@ -1,0 +1,17 @@
+{
+  "project": "P1_D001",
+  "query_project": "P1",
+  "export": "transfer",
+  "total": 1,
+  "fetched_rows": 1,
+  "fetched_at": "2026-09-11T15:04:00+08:00",
+  "rows": [
+    {
+      "ItemCode": "RRU-001",
+      "Product": "Radio Remote Unit 4480",
+      "Region": "Sabah",
+      "Warehouse": "WH-A",
+      "Quantity": "18"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@wms/inventory",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/query.js",
+    "./snapshot-builder": "./src/snapshot-builder.js"
+  }
+}

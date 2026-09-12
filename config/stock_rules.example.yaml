@@ -1,0 +1,7 @@
+# Verified against the sanitized fixture contract in tests/fixtures/inventory-batch.
+available_now:
+  preferred: authoritative_available_quantity
+  fallback: max(on_hand_quantity - locked_quantity, 0)
+locked: lock_quantity
+in_transfer: transfer_quantity
+transfer_counts_as_available_now: false

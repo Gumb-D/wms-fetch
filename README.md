@@ -4,9 +4,26 @@ Pulls ZTE SCM WMS exports (inventory / transfer / lock) per project number and
 writes them with a manifest. Built for the CelcomDigi extraction; other
 customers are just another file in `projects/`.
 
-Phase 1 scope is the extraction core only. No wagent, Darcy, Bailey, ePMS or
-Parquet integration - Bailey will later shell out to the CLI below and never
-touch WMS internals.
+The repository now also contains the Node.js WhatsApp inventory MVP. Python is
+retained temporarily as the verified extraction reference while JavaScript
+fixture-parity coverage is completed. The runtime uses Express, Baileys and
+node-cron as separate processes; WhatsApp never touches WMS credentials.
+
+## WhatsApp inventory MVP
+
+```bash
+npm install
+npm test
+npm run refresh
+npm run start:api
+npm run start:whatsapp
+npm run start:scheduler
+npm run status
+```
+
+See `docs/deployment-windows.md` for Windows setup and recovery. Runtime data
+belongs outside the repository and failed refreshes retain the last good
+verified snapshot.
 
 ## How it works
 
@@ -98,11 +115,11 @@ logs.
 
 ## Filter field mapping
 
-| Export    | Endpoint page       | WHtype   | Project number field |
-|-----------|---------------------|----------|----------------------|
-| inventory | InventoryQuery      | 10,40,60 | base code in `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
-| transfer  | InventoryQuery      | 50       | base code in `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
-| lock      | InventoryLockQuery  | n/a      | `ItemNum` |
+| Export    | Endpoint page      | WHtype   | Project number field                                      |
+| --------- | ------------------ | -------- | --------------------------------------------------------- |
+| inventory | InventoryQuery     | 10,40,60 | base code in `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
+| transfer  | InventoryQuery     | 50       | base code in `taPreSalesProjNo` + `taPreSalesProjNoMulti` |
+| lock      | InventoryLockQuery | n/a      | `ItemNum`                                                 |
 
 Lock also uses `Code=` rather than `CountryCode=`, adds a `URL=` param, sends
 no `CardNo`, and triggers `btnExport` instead of `btnExportDetail`.
@@ -114,7 +131,6 @@ no `CardNo`, and triggers `btnExport` instead of `btnExportDetail`.
 > returns zero rows. `taProjectNo` returns zero rows for these values. The
 > extractor therefore strips the final `_Dnnn` suffix before sending the WMS
 > filter, while retaining the full code in output filenames and manifests.
-
 
 ### Direct API mode
 

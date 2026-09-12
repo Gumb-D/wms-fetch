@@ -29,4 +29,17 @@ __pycache__/
 .venv/
 venv/
 
+# --- Node / local runtime ---
+node_modules/
+.env
+.env.*
+!.env.example
+/runtime/
+/output/
+/logs/
+*.log
+auth/whatsapp/
+**/whatsapp-auth/
+qr*.png
+
 reference/**/wmstransfer_export.txt
