@@ -6,6 +6,7 @@ import { datasetSchema, manifestSchema } from "@wms/contracts";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+const normalizeBaseProject = (value) => String(value).toUpperCase();
 
 async function readJson(file) {
   try {
@@ -49,12 +50,17 @@ export async function buildSnapshot(batchDir, options = {}) {
 
   const required = new Map();
   for (const result of manifest.results) {
-    const key = `${result.query_project}:${result.export}`;
+    const normalizedBase = normalizeBaseProject(result.query_project);
+    const key = `${normalizedBase}:${result.export}`;
     const entry = required.get(key) ?? { result, deliveryCodes: [] };
     entry.deliveryCodes.push(result.project);
     required.set(key, entry);
   }
-  const bases = [...new Set(manifest.results.map((r) => r.query_project))];
+  const bases = [
+    ...new Set(
+      manifest.results.map((r) => normalizeBaseProject(r.query_project)),
+    ),
+  ];
   for (const base of bases)
     for (const source of ["inventory", "lock", "transfer"]) {
       if (!required.has(`${base}:${source}`))
@@ -82,8 +88,9 @@ export async function buildSnapshot(batchDir, options = {}) {
         "TOTAL_MISMATCH",
         `Dataset row count mismatch: ${path.basename(file)}`,
       );
+    const normalizedBase = normalizeBaseProject(result.query_project);
     if (
-      dataset.query_project !== result.query_project ||
+      normalizeBaseProject(dataset.query_project) !== normalizedBase ||
       dataset.export !== result.export
     )
       throw fail(
@@ -109,7 +116,7 @@ export async function buildSnapshot(batchDir, options = {}) {
       records.push({
         snapshotId: manifest.run_id,
         sourceType: dataset.export,
-        baseProjectCode: dataset.query_project,
+        baseProjectCode: normalizedBase,
         requestedDeliveryCodes: codes,
         itemCode: row.ItemCode.trim(),
         product: row.Product.trim(),

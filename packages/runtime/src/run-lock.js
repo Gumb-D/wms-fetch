@@ -1,4 +1,5 @@
-import { mkdir, open, readFile, stat, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const processIsRunning = (pid) => {
@@ -21,7 +22,7 @@ export async function acquireRunLock(
   await mkdir(runtimeDir, { recursive: true });
   const lockPath = path.join(runtimeDir, "refresh.lock");
   let handle;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       handle = await open(lockPath, "wx");
       break;
@@ -39,9 +40,14 @@ export async function acquireRunLock(
         (oldMalformed ||
           (Number.isInteger(owner?.pid) && !isProcessRunning(owner.pid)))
       ) {
-        await unlink(lockPath).catch((unlinkError) => {
-          if (unlinkError.code !== "ENOENT") throw unlinkError;
-        });
+        const claimedPath = `${lockPath}.stale-${process.pid}-${randomUUID()}`;
+        try {
+          await rename(lockPath, claimedPath);
+        } catch (renameError) {
+          if (renameError.code === "ENOENT") continue;
+          throw renameError;
+        }
+        await unlink(claimedPath);
         continue;
       }
       throw Object.assign(new Error("Another refresh is already running"), {

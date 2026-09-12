@@ -46,6 +46,19 @@ describe("inventory queries", () => {
     expect(result.availableNow).toBe("88");
   });
 
+  test("groups snapshot project casing variants under one normalized base code", () => {
+    const casingVariant = structuredClone(snapshot);
+    for (const row of casingVariant.records.filter(
+      (row) => row.sourceType === "transfer",
+    )) {
+      row.baseProjectCode = row.baseProjectCode.toLowerCase();
+    }
+    const result = queryInventory({ term: "RRU" }, casingVariant);
+    expect(result.byBaseProject).toHaveLength(1);
+    expect(result.byBaseProject[0].baseProjectCode).toBe("P1");
+    expect(result.inTransfer).toBe("18");
+  });
+
   test("healthy no-match is a genuine zero result", () => {
     expect(queryInventory({ term: "NOT-THERE" }, snapshot)).toMatchObject({
       availableNow: "0",

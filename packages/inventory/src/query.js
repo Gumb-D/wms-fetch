@@ -41,9 +41,9 @@ export function queryInventory(query, snapshot, options = {}) {
   const itemCodes = [...new Set(matching.map((r) => r.itemCode))].sort();
   const summaries = [];
   for (const base of [
-    ...new Set(matching.map((r) => r.baseProjectCode)),
+    ...new Set(matching.map((r) => baseCode(r.baseProjectCode))),
   ].sort()) {
-    const rows = matching.filter((r) => r.baseProjectCode === base);
+    const rows = matching.filter((r) => baseCode(r.baseProjectCode) === base);
     const inventoryRows = rows.filter((r) => r.sourceType === "inventory");
     const onHand = sum(inventoryRows);
     const locked = sum(rows.filter((r) => r.sourceType === "lock"));

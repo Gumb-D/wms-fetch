@@ -20,6 +20,24 @@ describe("verified inventory snapshots", () => {
     ).toEqual(["P1_D001", "P1_D002"]);
   });
 
+  test("deduplicates base-project casing variants before reading datasets", async () => {
+    const manifest = JSON.parse(
+      await readFile(
+        path.join(fixture, "manifest_20260911_150000.json"),
+        "utf8",
+      ),
+    );
+    for (const result of manifest.results.filter(
+      (row) => row.project === "P1_D002",
+    ))
+      result.query_project = "p1";
+    const snapshot = await buildSnapshot(fixture, { manifest });
+    expect(snapshot.baseProjects).toEqual(["P1"]);
+    expect(
+      snapshot.records.filter((row) => row.itemCode === "RRU-001"),
+    ).toHaveLength(3);
+  });
+
   test("rejects incomplete manifests before reading data", async () => {
     await expect(
       buildSnapshot(fixture, {

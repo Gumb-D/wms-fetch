@@ -38,3 +38,18 @@ test("reclaims malformed lock data only after the creation grace period", async 
   const lock = await acquireRunLock(root, { malformedGraceMs: 30_000 });
   await lock.release();
 });
+
+test("concurrent stale-lock reclaim still grants exactly one lock", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "wms-race-lock-"));
+  const lockPath = path.join(root, "refresh.lock");
+  await writeFile(lockPath, "{");
+  const old = new Date(Date.now() - 31_000);
+  await utimes(lockPath, old, old);
+  const attempts = await Promise.allSettled([
+    acquireRunLock(root, { malformedGraceMs: 30_000 }),
+    acquireRunLock(root, { malformedGraceMs: 30_000 }),
+  ]);
+  const acquired = attempts.filter((result) => result.status === "fulfilled");
+  expect(acquired).toHaveLength(1);
+  await acquired[0].value.release();
+});
