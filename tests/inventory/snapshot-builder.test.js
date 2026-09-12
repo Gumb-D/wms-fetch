@@ -69,4 +69,26 @@ describe("verified inventory snapshots", () => {
     expect(current.snapshotId).toBe(snapshot.snapshotId);
     expect(current.path).toContain(snapshot.snapshotId);
   });
+
+  test("rejects a duplicate snapshot ID without replacing immutable data", async () => {
+    const runtime = await mkdtemp(
+      path.join(tmpdir(), "wms-duplicate-snapshot-"),
+    );
+    const snapshot = await buildSnapshot(fixture);
+    await publishSnapshot(snapshot, runtime);
+    const dataPath = path.join(
+      runtime,
+      "snapshots",
+      snapshot.snapshotId,
+      "inventory.json",
+    );
+    const original = await readFile(dataPath, "utf8");
+    await expect(
+      publishSnapshot(
+        { ...snapshot, records: [], publishedAt: new Date().toISOString() },
+        runtime,
+      ),
+    ).rejects.toBeDefined();
+    expect(await readFile(dataPath, "utf8")).toBe(original);
+  });
 });

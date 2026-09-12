@@ -7,6 +7,7 @@ import {
 } from "../../apps/whatsapp-bot/src/adapter.js";
 import { formatInventoryReply } from "../../apps/whatsapp-bot/src/formatter.js";
 import { createInventoryClient } from "../../apps/whatsapp-bot/src/inventory-client.js";
+import { retryConnection } from "../../apps/whatsapp-bot/src/reconnect.js";
 
 describe("WhatsApp boundary", () => {
   test.each([
@@ -166,5 +167,24 @@ describe("WhatsApp boundary", () => {
     expect(handler).toHaveBeenCalledTimes(2);
     expect(sendText).toHaveBeenCalledTimes(2);
     expect(onError).toHaveBeenCalledOnce();
+  });
+
+  test("retries rejected reconnect attempts with bounded backoff", async () => {
+    const connect = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("auth read failed"))
+      .mockRejectedValueOnce(new Error("socket failed"))
+      .mockResolvedValueOnce(undefined);
+    const wait = vi.fn(async () => {});
+    const onError = vi.fn();
+    await retryConnection(connect, {
+      initialDelay: 1000,
+      maxDelay: 2000,
+      wait,
+      onError,
+    });
+    expect(connect).toHaveBeenCalledTimes(3);
+    expect(wait.mock.calls.map(([delay]) => delay)).toEqual([1000, 2000, 2000]);
+    expect(onError).toHaveBeenCalledTimes(2);
   });
 });

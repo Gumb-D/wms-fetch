@@ -7,6 +7,7 @@ import makeWASocket, {
 import { createMessageHandler, handleUpsert } from "./adapter.js";
 import { createInventoryClient } from "./inventory-client.js";
 import { acquireKeepAwake } from "@wms/runtime/keep-awake";
+import { retryConnection } from "./reconnect.js";
 
 try {
   process.loadEnvFile();
@@ -35,8 +36,7 @@ const power = await acquireKeepAwake({
 });
 let stopped = false;
 
-async function connect(delay = 0) {
-  if (delay) await new Promise((r) => setTimeout(r, delay));
+async function connect() {
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
   const socket = makeWASocket({ auth: state, printQRInTerminal: true });
   const handler = createMessageHandler({
@@ -57,7 +57,10 @@ async function connect(delay = 0) {
       !stopped &&
       lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
     )
-      void connect(Math.min(delay ? delay * 2 : 1000, 30000));
+      void retryConnection(connect, {
+        initialDelay: 1000,
+        isStopped: () => stopped,
+      });
   });
 }
 const shutdown = async () => {
@@ -67,4 +70,4 @@ const shutdown = async () => {
 };
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
-await connect();
+await retryConnection(connect, { isStopped: () => stopped });

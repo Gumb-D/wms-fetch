@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import Decimal from "decimal.js";
 import { datasetSchema, manifestSchema } from "@wms/contracts";
@@ -154,33 +154,38 @@ export async function buildSnapshot(batchDir, options = {}) {
 }
 
 export async function publishSnapshot(snapshot, runtimeDir) {
+  const snapshotsDir = path.join(runtimeDir, "snapshots");
   const immutableDir = path.join(runtimeDir, "snapshots", snapshot.snapshotId);
-  await mkdir(immutableDir, { recursive: true });
-  const dataPath = path.join(immutableDir, "inventory.json");
-  const manifestPath = path.join(immutableDir, "manifest.json");
-  await writeFile(`${dataPath}.tmp`, `${JSON.stringify(snapshot)}\n`, {
-    flag: "wx",
-  });
-  await rename(`${dataPath}.tmp`, dataPath);
-  await writeFile(
-    manifestPath,
-    `${JSON.stringify(snapshot.manifest, null, 2)}\n`,
-    { flag: "wx" },
+  const stagingDir = path.join(
+    snapshotsDir,
+    `.staging-${snapshot.snapshotId}-${randomUUID()}`,
   );
+  await mkdir(snapshotsDir, { recursive: true });
+  await mkdir(stagingDir);
+  try {
+    await writeFile(
+      path.join(stagingDir, "inventory.json"),
+      `${JSON.stringify(snapshot)}\n`,
+    );
+    await writeFile(
+      path.join(stagingDir, "manifest.json"),
+      `${JSON.stringify(snapshot.manifest, null, 2)}\n`,
+    );
+    await rename(stagingDir, immutableDir);
+  } catch (error) {
+    await rm(stagingDir, { recursive: true, force: true });
+    throw error;
+  }
+  const dataPath = path.join(immutableDir, "inventory.json");
   const pointer = {
     snapshotId: snapshot.snapshotId,
     path: dataPath,
     publishedAt: snapshot.publishedAt,
   };
   await mkdir(runtimeDir, { recursive: true });
-  await writeFile(
-    path.join(runtimeDir, "current.json.tmp"),
-    `${JSON.stringify(pointer)}\n`,
-  );
-  await rename(
-    path.join(runtimeDir, "current.json.tmp"),
-    path.join(runtimeDir, "current.json"),
-  );
+  const pointerTemp = path.join(runtimeDir, `current.json.${randomUUID()}.tmp`);
+  await writeFile(pointerTemp, `${JSON.stringify(pointer)}\n`, { flag: "wx" });
+  await rename(pointerTemp, path.join(runtimeDir, "current.json"));
   return pointer;
 }
 
