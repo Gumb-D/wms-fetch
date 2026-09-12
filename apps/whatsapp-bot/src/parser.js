@@ -7,10 +7,11 @@ export function parseInventoryQuestion(input) {
   let region = text.match(REGION)?.[1]?.trim() ?? null;
   let term = text
     .replace(/^how\s+many\s+/i, "")
-    .replace(/\s+left\??$/i, "")
     .replace(/^(?:stock|available)\s+/i, "")
     .replace(/\s+for\s+\b(?:P?\d{6,})(?:_D\d{3})?\b/i, "")
     .replace(REGION, "")
+    .trim()
+    .replace(/\s+left\??$/i, "")
     .trim()
     .replace(/[?]+$/, "")
     .trim();

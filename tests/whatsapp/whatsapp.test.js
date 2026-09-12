@@ -17,6 +17,18 @@ describe("WhatsApp boundary", () => {
       { term: "RRU", project_codes: ["P202202168750_D002"], region: null },
     ],
     ["RRU in Sabah", { term: "RRU", project_codes: [], region: "Sabah" }],
+    [
+      "How many RRU left in Sabah?",
+      { term: "RRU", project_codes: [], region: "Sabah" },
+    ],
+    [
+      "How many RRU left for P202202168750_D002?",
+      {
+        term: "RRU",
+        project_codes: ["P202202168750_D002"],
+        region: null,
+      },
+    ],
   ])("parses %s", (text, expected) =>
     expect(parseInventoryQuestion(text)).toEqual(expected),
   );

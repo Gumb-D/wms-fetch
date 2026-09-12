@@ -1,72 +1,36 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
-
-const processIsRunning = (pid) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === "EPERM";
-  }
-};
+import lockfile from "proper-lockfile";
 
 export async function acquireRunLock(
   runtimeDir,
-  {
-    isProcessRunning = processIsRunning,
-    malformedGraceMs = 30_000,
-    now = Date.now,
-  } = {},
+  { staleMs = 30_000, updateMs = 10_000 } = {},
 ) {
   await mkdir(runtimeDir, { recursive: true });
   const lockPath = path.join(runtimeDir, "refresh.lock");
-  let handle;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      handle = await open(lockPath, "wx");
-      break;
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      let owner;
-      try {
-        owner = JSON.parse(await readFile(lockPath, "utf8"));
-      } catch {}
-      const malformed = !Number.isInteger(owner?.pid);
-      const oldMalformed =
-        malformed && now() - (await stat(lockPath)).mtimeMs >= malformedGraceMs;
-      if (
-        attempt === 0 &&
-        (oldMalformed ||
-          (Number.isInteger(owner?.pid) && !isProcessRunning(owner.pid)))
-      ) {
-        const claimedPath = `${lockPath}.stale-${process.pid}-${randomUUID()}`;
-        try {
-          await rename(lockPath, claimedPath);
-        } catch (renameError) {
-          if (renameError.code === "ENOENT") continue;
-          throw renameError;
-        }
-        await unlink(claimedPath);
-        continue;
-      }
-      throw Object.assign(new Error("Another refresh is already running"), {
-        code: "REFRESH_IN_PROGRESS",
-      });
-    }
+  let unlock;
+  try {
+    unlock = await lockfile.lock(runtimeDir, {
+      lockfilePath: lockPath,
+      realpath: false,
+      retries: 0,
+      stale: staleMs,
+      update: updateMs,
+    });
+  } catch (error) {
+    if (error.code !== "ELOCKED") throw error;
+    throw Object.assign(new Error("Another refresh is already running"), {
+      code: "REFRESH_IN_PROGRESS",
+      cause: error,
+    });
   }
-  await handle.writeFile(
-    JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }),
-  );
+
   let released = false;
   return {
     async release() {
       if (released) return;
       released = true;
-      await handle.close();
-      await unlink(lockPath).catch((error) => {
-        if (error.code !== "ENOENT") throw error;
-      });
+      await unlock();
     },
   };
 }

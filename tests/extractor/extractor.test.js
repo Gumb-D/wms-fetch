@@ -5,6 +5,7 @@ import {
   fetchDataset,
   runExtraction,
 } from "../../apps/extractor/src/wms-client.js";
+import { readCdpResponse } from "../../apps/extractor/src/cdp.js";
 
 describe("JavaScript extraction parity", () => {
   test("normalizes only delivery suffixes", () => {
@@ -83,5 +84,21 @@ describe("JavaScript extraction parity", () => {
       "P1_D001-false.json",
       "P1_D002-true.json",
     ]);
+  });
+
+  test("reads large CDP response bodies in bounded chunks", async () => {
+    const body = "x".repeat(11 * 1024 * 1024);
+    const evaluate = async (expression) => {
+      const match = expression.match(/slice\((\d+),(\d+)\)/);
+      return match ? body.slice(Number(match[1]), Number(match[2])) : null;
+    };
+    const result = await readCdpResponse(
+      evaluate,
+      "job",
+      body.length,
+      256 * 1024,
+    );
+    expect(result).toHaveLength(body.length);
+    expect(result).toBe(body);
   });
 });
