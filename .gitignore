@@ -9,6 +9,7 @@ downloads/
 output/
 logs/
 manifest*.json
+!tests/fixtures/inventory-batch/manifest_*.json
 _chat_dump.txt
 
 # --- reference source ---
