@@ -21,6 +21,30 @@ export async function readCdpResponse(
   return chunks.join("");
 }
 
+export async function executeCdpJob(evaluate, id) {
+  try {
+    for (let i = 0; i < 900; i += 1) {
+      const result = await evaluate(
+        `(()=>{const j=window.__wmsJobs[${JSON.stringify(id)}];if(!j)return {state:'missing'};return {state:j.state,status:j.status,size:j.data?.length,error:j.error}})()`,
+      );
+      if (result.state === "done") {
+        if (result.status !== 200) throw new Error(`WMS HTTP ${result.status}`);
+        return JSON.parse(await readCdpResponse(evaluate, id, result.size));
+      }
+      if (result.state === "error" || result.state === "missing")
+        throw new Error(
+          `Chrome WMS request failed: ${result.error ?? result.state}`,
+        );
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error("Chrome WMS request timed out");
+  } finally {
+    await evaluate(`delete window.__wmsJobs[${JSON.stringify(id)}]`).catch(
+      () => {},
+    );
+  }
+}
+
 export function createCdpRequester({
   script = process.env.WMS_CDP_SCRIPT ?? "C:\\dev\\aida-chrome\\cdp\\cdp.mjs",
   port = Number(process.env.WMS_CDP_PORT ?? 19222),
@@ -42,35 +66,6 @@ export function createCdpRequester({
     await evaluate(
       `(()=>{const id=${JSON.stringify(id)};window.__wmsJobs=window.__wmsJobs||{};const j=window.__wmsJobs[id]={state:'pending'};fetch(${JSON.stringify(requestUrl)},{method:'POST',credentials:'include',headers:{'content-type':'application/x-www-form-urlencoded; charset=UTF-8','x-requested-with':'XMLHttpRequest'},body:${JSON.stringify(body)}}).then(async r=>{j.status=r.status;j.data=await r.text();j.state='done'}).catch(e=>{j.error=String(e);j.state='error'});return id})()`,
     );
-    for (let i = 0; i < 900; i += 1) {
-      const result = await evaluate(
-        `(()=>{const j=window.__wmsJobs[${JSON.stringify(id)}];if(!j)return {state:'missing'};return {state:j.state,status:j.status,size:j.data?.length,error:j.error}})()`,
-      );
-      if (result.state === "done") {
-        try {
-          if (result.status !== 200)
-            throw new Error(`WMS HTTP ${result.status}`);
-          const data = await readCdpResponse(evaluate, id, result.size);
-          return JSON.parse(data);
-        } finally {
-          await evaluate(
-            `delete window.__wmsJobs[${JSON.stringify(id)}]`,
-          ).catch(() => {});
-        }
-      }
-      if (result.state === "error" || result.state === "missing") {
-        await evaluate(`delete window.__wmsJobs[${JSON.stringify(id)}]`).catch(
-          () => {},
-        );
-        throw new Error(
-          `Chrome WMS request failed: ${result.error ?? result.state}`,
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-    await evaluate(`delete window.__wmsJobs[${JSON.stringify(id)}]`).catch(
-      () => {},
-    );
-    throw new Error("Chrome WMS request timed out");
+    return executeCdpJob(evaluate, id);
   };
 }

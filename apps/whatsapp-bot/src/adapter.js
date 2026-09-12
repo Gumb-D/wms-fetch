@@ -30,20 +30,27 @@ export function createMessageHandler({ rules, query, maxRemembered = 2000 }) {
   };
 }
 
-export async function handleUpsert(upsert, { handler, sendText }) {
+export async function handleUpsert(
+  upsert,
+  { handler, sendText, onError = console.error },
+) {
   if (upsert.type !== "notify") return;
   for (const raw of upsert.messages) {
-    const chatId = raw.key.remoteJid;
-    const senderId = raw.key.participant ?? chatId;
-    const text =
-      raw.message?.conversation ?? raw.message?.extendedTextMessage?.text;
-    const reply = await handler({
-      id: raw.key.id,
-      chatId,
-      senderId,
-      text,
-      fromMe: raw.key.fromMe,
-    });
-    if (reply) await sendText(chatId, reply);
+    try {
+      const chatId = raw.key.remoteJid;
+      const senderId = raw.key.participant ?? chatId;
+      const text =
+        raw.message?.conversation ?? raw.message?.extendedTextMessage?.text;
+      const reply = await handler({
+        id: raw.key.id,
+        chatId,
+        senderId,
+        text,
+        fromMe: raw.key.fromMe,
+      });
+      if (reply) await sendText(chatId, reply);
+    } catch (error) {
+      onError(error, raw);
+    }
   }
 }

@@ -7,6 +7,7 @@ import {
 import { acquireRunLock } from "@wms/runtime/run-lock";
 import { runtimeStatus } from "@wms/runtime/status";
 import { createCdpRequester } from "./cdp.js";
+import { publishSnapshotWithLock } from "./snapshot.js";
 import { buildPagingParams, runExtraction } from "./wms-client.js";
 
 try {
@@ -164,7 +165,10 @@ else if (command === "build-snapshot") {
   if (!dir)
     throw new Error("Usage: npm run build-snapshot -- <batch-directory>");
   console.log(
-    await publishSnapshot(await buildSnapshot(path.resolve(dir)), runtime),
+    await publishSnapshotWithLock({
+      runtimeDir: runtime,
+      batchDir: path.resolve(dir),
+    }),
   );
 } else if (command === "refresh") console.log(await refresh());
 else if (command === "status")

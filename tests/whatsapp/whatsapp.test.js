@@ -137,4 +137,34 @@ describe("WhatsApp boundary", () => {
     expect(handler).not.toHaveBeenCalled();
     expect(sendText).not.toHaveBeenCalled();
   });
+
+  test("continues an upsert after an individual send failure", async () => {
+    const handler = vi.fn(async ({ id }) => `reply-${id}`);
+    const sendText = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("disconnected"))
+      .mockResolvedValueOnce(undefined);
+    const onError = vi.fn();
+    await expect(
+      handleUpsert(
+        {
+          type: "notify",
+          messages: [
+            {
+              key: { id: "1", remoteJid: "a" },
+              message: { conversation: "x" },
+            },
+            {
+              key: { id: "2", remoteJid: "b" },
+              message: { conversation: "y" },
+            },
+          ],
+        },
+        { handler, sendText, onError },
+      ),
+    ).resolves.toBeUndefined();
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(sendText).toHaveBeenCalledTimes(2);
+    expect(onError).toHaveBeenCalledOnce();
+  });
 });

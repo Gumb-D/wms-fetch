@@ -44,13 +44,13 @@ async function connect(delay = 0) {
     query: createInventoryClient({ baseUrl: process.env.INVENTORY_API_URL }),
   });
   socket.ev.on("creds.update", saveCreds);
-  socket.ev.on("messages.upsert", (upsert) =>
-    handleUpsert(upsert, {
+  socket.ev.on("messages.upsert", (upsert) => {
+    void handleUpsert(upsert, {
       handler,
       sendText: (destination, text) =>
         socket.sendMessage(destination, { text }),
-    }),
-  );
+    }).catch((error) => console.error("WhatsApp upsert failed", error));
+  });
   socket.ev.on("connection.update", ({ connection, lastDisconnect }) => {
     if (
       connection === "close" &&

@@ -1,11 +1,15 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   baseProjectCode,
   buildPagingParams,
   fetchDataset,
   runExtraction,
 } from "../../apps/extractor/src/wms-client.js";
-import { readCdpResponse } from "../../apps/extractor/src/cdp.js";
+import {
+  executeCdpJob,
+  readCdpResponse,
+} from "../../apps/extractor/src/cdp.js";
+import { publishSnapshotWithLock } from "../../apps/extractor/src/snapshot.js";
 
 describe("JavaScript extraction parity", () => {
   test("normalizes only delivery suffixes", () => {
@@ -100,5 +104,33 @@ describe("JavaScript extraction parity", () => {
     );
     expect(result).toHaveLength(body.length);
     expect(result).toBe(body);
+  });
+
+  test("cleans up browser jobs when CDP polling fails", async () => {
+    const expressions = [];
+    const evaluate = async (expression) => {
+      expressions.push(expression);
+      if (!expression.startsWith("delete ")) throw new Error("CDP timeout");
+    };
+    await expect(executeCdpJob(evaluate, "job")).rejects.toThrow("CDP timeout");
+    expect(expressions.at(-1)).toContain("delete window.__wmsJobs");
+  });
+
+  test("locks manual snapshot publication and releases after failure", async () => {
+    const release = vi.fn();
+    const acquireLock = vi.fn(async () => ({ release }));
+    await expect(
+      publishSnapshotWithLock({
+        runtimeDir: "runtime",
+        batchDir: "batch",
+        acquireLock,
+        build: async () => ({ snapshot: true }),
+        publish: async () => {
+          throw new Error("publish failed");
+        },
+      }),
+    ).rejects.toThrow("publish failed");
+    expect(acquireLock).toHaveBeenCalledWith("runtime");
+    expect(release).toHaveBeenCalledOnce();
   });
 });
