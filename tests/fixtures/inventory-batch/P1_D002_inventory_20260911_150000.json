@@ -1,0 +1,26 @@
+{
+  "project": "P1_D002",
+  "query_project": "P1",
+  "export": "inventory",
+  "total": 2,
+  "fetched_rows": 2,
+  "fetched_at": "2026-09-11T15:04:00+08:00",
+  "cache_hit": true,
+  "rows": [
+    {
+      "ItemCode": "RRU-001",
+      "Product": "Radio Remote Unit 4480",
+      "Alias": "RRU",
+      "Region": "Sabah",
+      "Warehouse": "WH-A",
+      "Quantity": "100"
+    },
+    {
+      "ItemCode": "ANT-001",
+      "Product": "Antenna",
+      "Region": "Sabah",
+      "Warehouse": "WH-A",
+      "Quantity": "5"
+    }
+  ]
+}

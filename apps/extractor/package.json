@@ -1,0 +1,5 @@
+{
+  "name": "@wms/extractor",
+  "private": true,
+  "type": "module"
+}

@@ -1,0 +1,1 @@
+{"name":"@wms/runtime","private":true,"type":"module","exports":{"./keep-awake":"./src/keep-awake.js","./run-lock":"./src/run-lock.js","./status":"./src/status.js"}}

@@ -1,0 +1,98 @@
+import Decimal from "decimal.js";
+import { matchesTerm, normalizeTerm } from "./catalog.js";
+
+const sum = (rows) =>
+  rows.reduce((total, row) => total.plus(row.quantity), new Decimal(0));
+const baseCode = (code) =>
+  String(code)
+    .replace(/_D\d+$/i, "")
+    .toUpperCase();
+
+const availableByItem = (rows) => {
+  const itemCodes = [...new Set(rows.map((row) => row.itemCode))];
+  return itemCodes.reduce((total, itemCode) => {
+    const itemRows = rows.filter((row) => row.itemCode === itemCode);
+    const inventoryRows = itemRows.filter(
+      (row) => row.sourceType === "inventory",
+    );
+    if (!inventoryRows.length) return total;
+    const available = inventoryRows.every(
+      (row) =>
+        row.availableQuantity !== null && row.availableQuantity !== undefined,
+    )
+      ? sum(inventoryRows.map((row) => ({ quantity: row.availableQuantity })))
+      : sum(inventoryRows).minus(
+          sum(itemRows.filter((row) => row.sourceType === "lock")),
+        );
+    return total.plus(Decimal.max(available, 0));
+  }, new Decimal(0));
+};
+
+export function queryInventory(query, snapshot, options = {}) {
+  const projects = new Set(
+    (query.projectCodes ?? query.project_codes ?? []).map(baseCode),
+  );
+  const region = query.region ? normalizeTerm(query.region) : null;
+  const scoped = snapshot.records.filter(
+    (row) =>
+      (!projects.size || projects.has(baseCode(row.baseProjectCode))) &&
+      (!region || normalizeTerm(row.region ?? "") === region),
+  );
+  const termMatches = scoped.filter((row) =>
+    matchesTerm(row, query.term, options.aliases),
+  );
+  const families = new Map();
+  const aliasByItem = new Map(
+    termMatches
+      .filter((row) => row.alias)
+      .map((row) => [row.itemCode, normalizeTerm(row.alias)]),
+  );
+  for (const row of termMatches) {
+    const family = aliasByItem.get(row.itemCode) || normalizeTerm(row.product);
+    if (!families.has(family)) families.set(family, row.product);
+  }
+  if (families.size > 1) {
+    throw Object.assign(
+      new Error("Inventory term matches multiple product families"),
+      {
+        code: "AMBIGUOUS_TERM",
+        candidates: [...families.values()].sort().slice(0, 5),
+      },
+    );
+  }
+  const itemCodes = [...new Set(termMatches.map((r) => r.itemCode))].sort();
+  const selectedItems = new Set(itemCodes);
+  const matching = scoped.filter((row) => selectedItems.has(row.itemCode));
+  const summaries = [];
+  for (const base of [
+    ...new Set(matching.map((r) => baseCode(r.baseProjectCode))),
+  ].sort()) {
+    const rows = matching.filter((r) => baseCode(r.baseProjectCode) === base);
+    const locked = sum(rows.filter((r) => r.sourceType === "lock"));
+    const transfer = sum(rows.filter((r) => r.sourceType === "transfer"));
+    summaries.push({
+      baseProjectCode: base,
+      requestedDeliveryCodes: [
+        ...new Set(rows.flatMap((r) => r.requestedDeliveryCodes)),
+      ].sort(),
+      availableNow: availableByItem(rows).toString(),
+      locked: locked.toString(),
+      inTransfer: transfer.toString(),
+    });
+  }
+  return {
+    term: query.term,
+    snapshotId: snapshot.snapshotId,
+    snapshotTime: snapshot.snapshotTime,
+    matchedItemCodes: itemCodes,
+    availableNow: sum(
+      summaries.map((r) => ({ quantity: r.availableNow })),
+    ).toString(),
+    locked: sum(summaries.map((r) => ({ quantity: r.locked }))).toString(),
+    inTransfer: sum(
+      summaries.map((r) => ({ quantity: r.inTransfer })),
+    ).toString(),
+    byBaseProject: summaries,
+    warnings: [],
+  };
+}

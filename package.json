@@ -1,0 +1,40 @@
+{
+  "name": "wms-fetch",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "start:api": "node apps/inventory-api/src/server.js",
+    "start:whatsapp": "node apps/whatsapp-bot/src/index.js",
+    "start:scheduler": "node apps/scheduler/src/index.js",
+    "extract": "node apps/extractor/src/cli.js extract",
+    "build-snapshot": "node apps/extractor/src/cli.js build-snapshot",
+    "refresh": "node apps/extractor/src/cli.js refresh",
+    "status": "node apps/extractor/src/cli.js status"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "decimal.js": "10.6.0",
+    "express": "5.2.1",
+    "node-cron": "4.2.1",
+    "pino": "9.9.5",
+    "proper-lockfile": "4.1.2",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.35.0",
+    "eslint": "9.35.0",
+    "prettier": "3.6.2",
+    "supertest": "7.1.4",
+    "vitest": "3.2.4"
+  }
+}
