@@ -15,8 +15,9 @@ const finiteQuantity = (value, file) => {
 };
 
 async function readJson(file) {
+  const contents = await readFile(file, "utf8");
   try {
-    return JSON.parse(await readFile(file, "utf8"));
+    return JSON.parse(contents);
   } catch (error) {
     throw fail(
       "SCHEMA_MISMATCH",

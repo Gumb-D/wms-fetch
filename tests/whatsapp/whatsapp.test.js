@@ -34,6 +34,11 @@ describe("WhatsApp boundary", () => {
     expect(parseInventoryQuestion(text)).toEqual(expected),
   );
 
+  test.each(["see you tomorrow", "let us meet later", "thanks", "ok"])(
+    "ignores ordinary conversation %s",
+    (text) => expect(parseInventoryQuestion(text)).toBeNull(),
+  );
+
   test("group authorization requires both approved group and sender", () => {
     const rules = {
       senders: ["60111111111@s.whatsapp.net"],

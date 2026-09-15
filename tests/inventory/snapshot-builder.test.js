@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   buildSnapshot,
+  loadCurrentSnapshot,
   publishSnapshot,
 } from "../../packages/inventory/src/snapshot-builder.js";
 
@@ -113,5 +114,30 @@ describe("verified inventory snapshots", () => {
       ),
     ).rejects.toBeDefined();
     expect(await readFile(dataPath, "utf8")).toBe(original);
+  });
+  test("maps a missing current pointer to NO_VALID_SNAPSHOT", async () => {
+    const runtime = await mkdtemp(path.join(tmpdir(), "snap-missing-"));
+    await expect(loadCurrentSnapshot(runtime)).rejects.toMatchObject({
+      code: "NO_VALID_SNAPSHOT",
+    });
+  });
+
+  test("maps a missing referenced snapshot file to NO_VALID_SNAPSHOT", async () => {
+    const runtime = await mkdtemp(path.join(tmpdir(), "snap-dangling-"));
+    await writeFile(
+      path.join(runtime, "current.json"),
+      JSON.stringify({ path: path.join(runtime, "does-not-exist.json") }),
+    );
+    await expect(loadCurrentSnapshot(runtime)).rejects.toMatchObject({
+      code: "NO_VALID_SNAPSHOT",
+    });
+  });
+
+  test("keeps SCHEMA_MISMATCH for malformed current pointer content", async () => {
+    const runtime = await mkdtemp(path.join(tmpdir(), "snap-malformed-"));
+    await writeFile(path.join(runtime, "current.json"), "{ not json");
+    await expect(loadCurrentSnapshot(runtime)).rejects.toMatchObject({
+      code: "SCHEMA_MISMATCH",
+    });
   });
 });
